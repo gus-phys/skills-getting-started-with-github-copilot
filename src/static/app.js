@@ -61,7 +61,8 @@ document.addEventListener("DOMContentLoaded", () => {
           participants.forEach((p) => {
             const initials = getInitials(p);
             const displayName = escapeHtml(String(p).split("@")[0]);
-            participantsHtml += `<li class="participant-item"><span class="participant-badge">${escapeHtml(initials)}</span><span class="participant-name">${displayName}</span></li>`;
+            // Add delete icon (button) with data attributes
+            participantsHtml += `<li class="participant-item"><span class="participant-badge">${escapeHtml(initials)}</span><span class="participant-name">${displayName}</span><button class="delete-participant" title="Remove" data-email="${escapeHtml(p)}" style="background:none;border:none;color:#c00;font-size:18px;cursor:pointer;margin-left:8px;" aria-label="Remove participant">&#128465;</button></li>`;
           });
           participantsHtml += "</ul>";
         } else {
@@ -132,4 +133,29 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Initialize app
   fetchActivities();
+  // Handle participant delete (unregister)
+  activitiesList.addEventListener("click", async (event) => {
+    if (event.target.classList.contains("delete-participant")) {
+      const button = event.target;
+      const email = button.getAttribute("data-email");
+      // Find the activity name (from the closest .activity-card)
+      const card = button.closest(".activity-card");
+      const activityName = card ? card.querySelector("h4")?.textContent : null;
+      if (!activityName || !email) return;
+      if (!confirm(`Remove ${email} from ${activityName}?`)) return;
+      try {
+        const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+          method: "DELETE"
+        });
+        const result = await response.json();
+        if (response.ok) {
+          fetchActivities();
+        } else {
+          alert(result.detail || "Failed to remove participant.");
+        }
+      } catch (err) {
+        alert("Error removing participant.");
+      }
+    }
+  });
 });
