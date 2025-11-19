@@ -4,6 +4,33 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
+  // Helper: simple HTML escaper to avoid injection
+  function escapeHtml(str) {
+    if (typeof str !== "string") return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  // Helper: compute up to 2 initials from the part before @
+  function getInitials(email) {
+    try {
+      const local = (email && String(email).split("@")[0]) || "";
+      const parts = local.split(/[\W_]+/).filter(Boolean);
+      if (parts.length === 0) return local.slice(0, 2).toUpperCase() || "?";
+      const initials = parts
+        .map((p) => p[0].toUpperCase())
+        .slice(0, 2)
+        .join("");
+      return initials;
+    } catch {
+      return "?";
+    }
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
@@ -13,18 +40,40 @@ document.addEventListener("DOMContentLoaded", () => {
       // Clear loading message
       activitiesList.innerHTML = "";
 
+      // Clear existing options except placeholder
+      // Remove any previously added options (keep first placeholder)
+      while (activitySelect.options.length > 1) {
+        activitySelect.remove(1);
+      }
+
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
         const activityCard = document.createElement("div");
         activityCard.className = "activity-card";
 
-        const spotsLeft = details.max_participants - details.participants.length;
+        const spotsLeft = details.max_participants - (details.participants ? details.participants.length : 0);
+
+        // Build participants section
+        const participants = Array.isArray(details.participants) ? details.participants : [];
+        let participantsHtml = "";
+        if (participants.length) {
+          participantsHtml = '<ul class="participants">';
+          participants.forEach((p) => {
+            const initials = getInitials(p);
+            const displayName = escapeHtml(String(p).split("@")[0]);
+            participantsHtml += `<li class="participant-item"><span class="participant-badge">${escapeHtml(initials)}</span><span class="participant-name">${displayName}</span></li>`;
+          });
+          participantsHtml += "</ul>";
+        } else {
+          participantsHtml = '<p class="no-participants">No participants yet</p>';
+        }
 
         activityCard.innerHTML = `
-          <h4>${name}</h4>
-          <p>${details.description}</p>
-          <p><strong>Schedule:</strong> ${details.schedule}</p>
+          <h4>${escapeHtml(name)}</h4>
+          <p>${escapeHtml(details.description || "")}</p>
+          <p><strong>Schedule:</strong> ${escapeHtml(details.schedule || "")}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHtml}
         `;
 
         activitiesList.appendChild(activityCard);
